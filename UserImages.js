@@ -4,10 +4,6 @@ var AWS = require('aws-sdk');
 var gm = require('gm').subClass({ imageMagick: true }); // Enable ImageMagick integration.
 var util = require('util');
 
-// constants
-var MAX_WIDTH  = 500;
-var MAX_HEIGHT = 500;
-
 // S3 and DynamoDB clients
 var s3 = new AWS.S3();
 var db = new AWS.DynamoDB.DocumentClient();
@@ -19,8 +15,25 @@ exports.handler = function(event, context, callback) {
   // Object key may have spaces or unicode non-ASCII characters.
   var srcKey = decodeURIComponent(event.Records[0].s3.object.key.replace(/\+/g, " "));
   var dstBucket = srcBucket + '-resized'; // destination bucket name
+
+  // construct filename for resized image:
   // username-picture-orig.extension --> username-picture-500.extension
-  var dstKey    = srcKey.replace('orig', '500');
+  // username-cover-orig.extension --> username-cover-1280.extension
+  var dstKey;
+  var MAX_WIDTH, MAX_HEIGHT;
+  if(srcKey.indexOf('picture') > -1) {
+    dstKey = srcKey.replace('orig', '500');
+    MAX_WIDTH = 500;
+    MAX_HEIGHT = 500;
+  } else if(srcKey.indexOf('cover') > -1) {
+    dstKey = srcKey.replace('orig', '1280');
+    MAX_WIDTH = 1280;
+    MAX_HEIGHT = 1280;
+  } else {
+    callback("Invalid source bucket key.");
+    return;
+  }
+
   // construct table name (appending 'dev' if the source bucket is a devlopment bucket)
   var dbTable = 'UserImages';
   if(srcBucket.indexOf('dev') > -1) {
