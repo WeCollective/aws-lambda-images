@@ -85,12 +85,7 @@ exports.handler = function(event, context, callback) {
         Key: dstKey,
         Body: data,
         ContentType: contentType
-      }, next);
-    },
-    function save(err, data, next) {
-      if(err) {
-        next(err);
-      } else {
+      }, function(err, data) {
         // Save the reference in the database
         db.put({
           TableName: dbTable,
@@ -100,7 +95,7 @@ exports.handler = function(event, context, callback) {
             filename: srcKey
           }
         }, next);
-      }
+      });
     }
     ], function (err) {
       if (err) {
