@@ -56,7 +56,7 @@ module.exports = function(grunt) {
   **    grunt build           lints the js
   */
   grunt.registerTask('build:development', ['exec:checkout:development', 'jshint', 'zip']);
-  grunt.registerTask('build:production', ['exec:checkout:production', 'jshint', 'zip']);
+  grunt.registerTask('build:production', ['exec:publish', 'exec:checkout:production', 'jshint', 'zip']);
   grunt.registerTask('deploy:development', ['build:development', 'exec:deploy:development']);
   grunt.registerTask('deploy:production', ['build:production', 'exec:deploy:production']);
 };
