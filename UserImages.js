@@ -87,21 +87,12 @@ exports.handler = function(event, context, callback) {
         ContentType: contentType
       }, function(err, data) {
         // Save the reference in the database
-        console.log("Adding to DB:");
-        console.log({
-          TableName: dbTable,
-          Item: {
-            id: srcKey.substr(0, srcKey.indexOf('-orig')),
-            date: new Date().getTime(),
-            filename: srcKey
-          }
-        });
         db.put({
           TableName: dbTable,
           Item: {
             id: srcKey.substr(0, srcKey.indexOf('-orig')),
             date: new Date().getTime(),
-            filename: srcKey
+            extension: imageType
           }
         }, next);
       });
