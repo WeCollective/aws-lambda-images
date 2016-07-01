@@ -8,8 +8,9 @@ var util = require('util');
 var MAX_WIDTH  = 500;
 var MAX_HEIGHT = 500;
 
-// get reference to S3 client
+// S3 and DynamoDB clients
 var s3 = new AWS.S3();
+var db = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = function(event, context, callback) {
   // Read options from the event.
@@ -20,6 +21,11 @@ exports.handler = function(event, context, callback) {
   var dstBucket = srcBucket + '-resized'; // destination bucket name
   // username-picture-orig.extension --> username-picture-500.extension
   var dstKey    = srcKey.replace('orig', '500');
+  // construct table name (appending 'dev' if the source bucket is a devlopment bucket)
+  var dbTable = 'UserImages';
+  if(srcBucket.indexOf('dev') > -1) {
+    dbTable = 'dev' + dbTable;
+  }
 
   // Sanity check: validate that source and destination are different buckets.
   if (srcBucket == dstBucket) {
@@ -80,6 +86,21 @@ exports.handler = function(event, context, callback) {
         Body: data,
         ContentType: contentType
       }, next);
+    },
+    function save(err, data, next) {
+      if(err) {
+        next(err);
+      } else {
+        // Save the reference in the database
+        db.put({
+          TableName: dbTable,
+          Item: {
+            id: srcKey.substr(0, srcKey.indexOf('-orig')),
+            date: new Date().getTime(),
+            filename: srcKey
+          }
+        }, next);
+      }
     }
     ], function (err) {
       if (err) {
