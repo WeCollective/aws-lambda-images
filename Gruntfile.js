@@ -8,7 +8,7 @@ module.exports = function(grunt) {
   grunt.initConfig({
     // javascript linting
     jshint: {
-      files: ['Gruntfile.js', 'UserImages.js'],
+      files: ['Gruntfile.js', 'Images.js'],
       options: {
         node: true // tell jshint we are using nodejs to avoid incorrect errors
       }
@@ -35,20 +35,20 @@ module.exports = function(grunt) {
           var functionName;
           if(environment == 'development') {
             checkout = 'master';
-            functionName = 'devUserImages';
+            functionName = 'devImages';
           } else if(environment == 'production') {
             checkout = 'production';
-            functionName = 'UserImages';
+            functionName = 'Images';
           } else {
             return '';
           }
-          var deployCommand = 'aws lambda update-function-code --function-name ' + functionName + ' --zip-file fileb://UserImages.zip --region eu-west-1 --profile weco';
+          var deployCommand = 'aws lambda update-function-code --function-name ' + functionName + ' --zip-file fileb://Images.zip --region eu-west-1 --profile weco';
           return 'echo Checking out ' + checkout + ' && git checkout ' + checkout + ' && echo Deploying... && ' + deployCommand + ' && git checkout master';
         }
       }
     },
     zip: {
-      'UserImages.zip': ['UserImages.js', 'node_modules/**/*']
+      'Images.zip': ['Images.js', 'node_modules/**/*']
     }
   });
 

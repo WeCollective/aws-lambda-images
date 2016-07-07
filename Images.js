@@ -35,7 +35,12 @@ exports.handler = function(event, context, callback) {
   }
 
   // construct table name (appending 'dev' if the source bucket is a devlopment bucket)
-  var dbTable = 'UserImages';
+  var dbTable;
+  if(srcBucket.indexOf('user-images') > -1) {
+    dbTable = 'UserImages';
+  } else if(srcBucket.indexOf('branch-images') > -1) {
+    dbTable = 'BranchImages';
+  }
   if(srcBucket.indexOf('dev') > -1) {
     dbTable = 'dev' + dbTable;
   }
