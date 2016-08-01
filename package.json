@@ -1,0 +1,26 @@
+{
+  "name": "images-lambda",
+  "version": "1.0.0",
+  "description": "",
+  "main": "Images.js",
+  "dependencies": {
+    "async": "^2.0.1",
+    "gm": "^1.22.0"
+  },
+  "devDependencies": {
+    "grunt": "^1.0.1",
+    "grunt-contrib-jshint": "^1.0.0",
+    "grunt-exec": "^1.0.0",
+    "grunt-zip": "^0.17.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://MSChristensen@bitbucket.org/wecollective/wecolambdaimages.git"
+  },
+  "author": "Mike Christensen",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/wecollective/wecolambdaimages#readme"
+}
