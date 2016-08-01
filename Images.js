@@ -16,19 +16,29 @@ exports.handler = function(event, context, callback) {
   var srcKey = decodeURIComponent(event.Records[0].s3.object.key.replace(/\+/g, " "));
   var dstBucket = srcBucket + '-resized'; // destination bucket name
 
-  // construct filename for resized image:
-  // username-picture-orig.extension --> username-picture-500.extension
-  // username-cover-orig.extension --> username-cover-1280.extension
+  // construct filenames for resized images:
+  // username-picture-orig.extension --> username-picture-200.extension (thumb)
+  // username-picture-orig.extension --> username-picture-640.extension
+  // username-cover-orig.extension --> username-cover-800.extension     (thumb)
+  // username-cover-orig.extension --> username-cover-1920.extension
   var dstKey;
+  var dstKeyThumb;
   var MAX_WIDTH, MAX_HEIGHT;
+  var THUMB_WIDTH, THUMB_HEIGHT;
   if(srcKey.indexOf('picture') > -1) {
-    dstKey = srcKey.replace('orig', '500');
-    MAX_WIDTH = 500;
-    MAX_HEIGHT = 500;
+    dstKey = srcKey.replace('orig', '640');
+    dstKeyThumb = srcKey.replace('orig', '200');
+    MAX_WIDTH = 640;
+    MAX_HEIGHT = 640;
+    THUMB_WIDTH = 200;
+    THUMB_HEIGHT = 200;
   } else if(srcKey.indexOf('cover') > -1) {
-    dstKey = srcKey.replace('orig', '1280');
-    MAX_WIDTH = 1280;
-    MAX_HEIGHT = 1280;
+    dstKey = srcKey.replace('orig', '1920');
+    dstKeyThumb = srcKey.replace('orig', '800');
+    MAX_WIDTH = 1920;
+    MAX_HEIGHT = 1920;
+    THUMB_WIDTH = 800;
+    THUMB_HEIGHT = 800;
   } else {
     callback("Invalid source bucket key.");
     return;
@@ -82,8 +92,14 @@ exports.handler = function(event, context, callback) {
           MAX_WIDTH / size.width,
           MAX_HEIGHT / size.height
         );
+        var scalingFactorThumb = Math.min(
+          THUMB_WIDTH / size.width,
+          THUMB_HEIGHT / size.height
+        );
         var width  = scalingFactor * size.width;
         var height = scalingFactor * size.height;
+        var widthThumb  = scalingFactorThumb * size.width;
+        var heightThumb = scalingFactorThumb * size.height;
 
         // Transform the image buffer in memory.
         this.resize(width, height)
@@ -91,28 +107,50 @@ exports.handler = function(event, context, callback) {
             if (err) {
               next(err);
             } else {
-              next(null, response.ContentType, buffer);
+              this.resize(widthThumb, heightThumb)
+                .toBuffer(imageType, function(err, bufferThumb) {
+                  if (err) {
+                    next(err);
+                  } else {
+                    next(null, response.ContentType, buffer, bufferThumb);
+                  }
+                });
             }
           });
       });
     },
-    function upload(contentType, data, next) {
-      // Stream the transformed image to a different S3 bucket.
+    function upload(contentType, data, dataThumb, next) {
+      // upload the resized image
       s3.putObject({
         Bucket: dstBucket,
         Key: dstKey,
         Body: data,
         ContentType: contentType
       }, function(err, data) {
-        // Save the reference in the database
-        db.put({
-          TableName: dbTable,
-          Item: {
-            id: srcKey.substr(0, srcKey.indexOf('-orig')),
-            date: new Date().getTime(),
-            extension: imageType
+        if(err) {
+          return next(err);
+        }
+
+        // upload the thumb image
+        s3.putObject({
+          Bucket: dstBucket,
+          Key: dstKeyThumb,
+          Body: dataThumb,
+          ContentType: contentType
+        }, function(err, data) {
+          if(err) {
+            return next(err);
           }
-        }, next);
+          // Save the reference in the database
+          db.put({
+            TableName: dbTable,
+            Item: {
+              id: srcKey.substr(0, srcKey.indexOf('-orig')),
+              date: new Date().getTime(),
+              extension: imageType
+            }
+          }, next);
+        });
       });
     }
     ], function (err) {
