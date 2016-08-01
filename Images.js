@@ -96,19 +96,23 @@ exports.handler = function(event, context, callback) {
           THUMB_WIDTH / size.width,
           THUMB_HEIGHT / size.height
         );
+        console.log("SIZES: " + MAX_WIDTH + "x" + MAX_HEIGHT + ", " + THUMB_WIDTH + "x" + THUMB_HEIGHT);
         var width  = scalingFactor * size.width;
         var height = scalingFactor * size.height;
         var widthThumb  = scalingFactorThumb * size.width;
         var heightThumb = scalingFactorThumb * size.height;
 
         // Transform the image buffer in memory.
-        this.resize(width, height)
+        var _this = this;
+        _this.resize(width, height)
           .toBuffer(imageType, function(err, buffer) {
+            console.log("RESIZED ONE");
             if (err) {
               next(err);
             } else {
-              this.resize(widthThumb, heightThumb)
+              _this.resize(widthThumb, heightThumb)
                 .toBuffer(imageType, function(err, bufferThumb) {
+                  console.log("RESIZED TWO");
                   if (err) {
                     next(err);
                   } else {
@@ -120,6 +124,7 @@ exports.handler = function(event, context, callback) {
       });
     },
     function upload(contentType, data, dataThumb, next) {
+      console.log("UPLOADING");
       // upload the resized image
       s3.putObject({
         Bucket: dstBucket,
@@ -127,6 +132,7 @@ exports.handler = function(event, context, callback) {
         Body: data,
         ContentType: contentType
       }, function(err, data) {
+        console.log("UPLOADED ONE");
         if(err) {
           return next(err);
         }
@@ -138,6 +144,7 @@ exports.handler = function(event, context, callback) {
           Body: dataThumb,
           ContentType: contentType
         }, function(err, data) {
+          console.log("UPLOADED TWO");
           if(err) {
             return next(err);
           }
