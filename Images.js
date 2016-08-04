@@ -50,6 +50,8 @@ exports.handler = function(event, context, callback) {
     dbTable = 'UserImages';
   } else if(srcBucket.indexOf('branch-images') > -1) {
     dbTable = 'BranchImages';
+  } else if(srcBucket.indexOf('post-images') > -1) {
+    dbTable = 'PostImages';
   }
   if(srcBucket.indexOf('dev') > -1) {
     dbTable = 'dev' + dbTable;
