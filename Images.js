@@ -1,176 +1,175 @@
-// dependencies
-var async = require('async');
-var AWS = require('aws-sdk');
-var gm = require('gm').subClass({ imageMagick: true }); // Enable ImageMagick integration.
-var util = require('util');
+const async = require('async');
+const AWS = require('aws-sdk');
+const gm = require('gm').subClass({ imageMagick: true });
+const util = require('util');
 
-// S3 and DynamoDB clients
-var s3 = new AWS.S3();
-var db = new AWS.DynamoDB.DocumentClient();
+const db = new AWS.DynamoDB.DocumentClient();
+const s3 = new AWS.S3();
 
-exports.handler = function(event, context, callback) {
-  // Read options from the event.
+exports.handler = (event, context, callback) => {
   console.log('Reading options from event:\n', util.inspect(event, {depth: 5}));
-  var srcBucket = event.Records[0].s3.bucket.name;
-  // Object key may have spaces or unicode non-ASCII characters.
-  var srcKey = decodeURIComponent(event.Records[0].s3.object.key.replace(/\+/g, " "));
-  var dstBucket = srcBucket + '-resized'; // destination bucket name
 
-  // construct filenames for resized images:
-  // username-picture-orig.extension --> username-picture-200.extension (thumb)
-  // username-picture-orig.extension --> username-picture-640.extension
-  // username-cover-orig.extension --> username-cover-800.extension     (thumb)
-  // username-cover-orig.extension --> username-cover-1920.extension
-  var dstKey;
-  var dstKeyThumb;
-  var MAX_WIDTH, MAX_HEIGHT;
-  var THUMB_WIDTH, THUMB_HEIGHT;
-  if(srcKey.indexOf('picture') > -1) {
+  // Object key may have spaces or unicode non-ASCII characters.
+  const srcKey = decodeURIComponent(event.Records[0].s3.object.key.replace(/\+/g, ' '));
+  const srcBucket = event.Records[0].s3.bucket.name;
+  const dstBucket = `${srcBucket}-resized`;
+
+  // Construct filenames for resized images.
+  // username-picture-orig.ext --> username-picture-200.ext (thumb)
+  // username-picture-orig.ext --> username-picture-640.ext
+  // username-cover-orig.ext --> username-cover-800.ext (thumb)
+  // username-cover-orig.ext --> username-cover-1920.ext
+  let dstKey;
+  let dstKeyThumb;
+  let MAX_HEIGHT;
+  let MAX_WIDTH;
+  let THUMB_HEIGHT;
+  let THUMB_WIDTH;
+
+  if (srcKey.includes('picture')) {
     dstKey = srcKey.replace('orig', '640');
     dstKeyThumb = srcKey.replace('orig', '200');
-    MAX_WIDTH = 640;
     MAX_HEIGHT = 640;
-    THUMB_WIDTH = 200;
+    MAX_WIDTH = 640;
     THUMB_HEIGHT = 200;
-  } else if(srcKey.indexOf('cover') > -1) {
+    THUMB_WIDTH = 200;
+  }
+  else if (srcKey.includes('cover')) {
     dstKey = srcKey.replace('orig', '1920');
     dstKeyThumb = srcKey.replace('orig', '800');
-    MAX_WIDTH = 1920;
     MAX_HEIGHT = 1920;
-    THUMB_WIDTH = 800;
+    MAX_WIDTH = 1920;
     THUMB_HEIGHT = 800;
-  } else {
-    callback("Invalid source bucket key.");
+    THUMB_WIDTH = 800;
+  }
+  else {
+    callback('Invalid source bucket key.');
     return;
   }
 
-  // construct table name (appending 'dev' if the source bucket is a devlopment bucket)
-  var dbTable;
-  if(srcBucket.indexOf('user-images') > -1) {
+  // Construct table name (prepend 'dev' to devlopment buckets).
+  let dbTable;
+
+  if (srcBucket.includes('user-images')) {
     dbTable = 'UserImages';
-  } else if(srcBucket.indexOf('branch-images') > -1) {
+  }
+  else if (srcBucket.includes('branch-images')) {
     dbTable = 'BranchImages';
-  } else if(srcBucket.indexOf('post-images') > -1) {
+  }
+  else if (srcBucket.includes('post-images')) {
     dbTable = 'PostImages';
   }
-  if(srcBucket.indexOf('dev') > -1) {
-    dbTable = 'dev' + dbTable;
+
+  if (srcBucket.includes('dev')) {
+    dbTable = `dev${dbTable}`;
   }
 
-  // Sanity check: validate that source and destination are different buckets.
-  if (srcBucket == dstBucket) {
-    callback("Source and destination buckets are the same.");
+  // Sanity check: source and destination buckets must be different.
+  if (srcBucket === dstBucket) {
+    callback('Source and destination buckets are the same.');
     return;
   }
 
   // Infer the image type.
-  var typeMatch = srcKey.match(/\.([^.]*)$/);
+  const typeMatch = srcKey.match(/\.([^.]*)$/);
   if (!typeMatch) {
     callback('Could not determine the image type.');
     return;
   }
-  var imageType = typeMatch[1];
+  const imageType = typeMatch[1].toLowerCase();
 
-  // IMPORTANT: Only these filetypes will be resized!
-  var validTypes = ['jpg', 'JPG', 'jpe', 'JPE', 'jpeg', 'JPEG', 'png', 'PNG', 'bmp', 'BMP'];
-  if (validTypes.indexOf(imageType) == -1) {
-    callback('Unsupported image type: ${imageType}');
+  // Only these filetypes will be resized.
+  const validImageTypes = [
+    'jpg',
+    'jpe',
+    'jpeg',
+    'png',
+    'bmp',
+  ];
+  if (!validImageTypes.includes(imageType)) {
+    callback(`Unsupported image type: ${imageType}`);
     return;
   }
 
   // Download the image from S3, transform, and upload to a different S3 bucket.
   async.waterfall([
-    function download(next) {
-      // Download the image from S3 into a buffer.
+    function download (next) {
       s3.getObject({
         Bucket: srcBucket,
-        Key: srcKey
+        Key: srcKey,
       }, next);
     },
-    function transform(response, next) {
-      gm(response.Body).size(function(err, size) {
+    function transform (response, next) {
+      gm(response.Body).size(function (err, size) {
         // Infer the scaling factor to avoid stretching the image unnaturally.
-        var scalingFactor = Math.min(
-          MAX_WIDTH / size.width,
-          MAX_HEIGHT / size.height
-        );
-        var scalingFactorThumb = Math.min(
-          THUMB_WIDTH / size.width,
-          THUMB_HEIGHT / size.height
-        );
+        const scalingFactor = Math.min(MAX_WIDTH / size.width, MAX_HEIGHT / size.height);
+        const scalingFactorThumb = Math.min(THUMB_WIDTH / size.width, THUMB_HEIGHT / size.height);
 
-        var width  = scalingFactor * size.width;
-        var height = scalingFactor * size.height;
-        var widthThumb  = scalingFactorThumb * size.width;
-        var heightThumb = scalingFactorThumb * size.height;
+        const height = scalingFactor * size.height;
+        const width = scalingFactor * size.width;
+        const heightThumb = scalingFactorThumb * size.height;
+        const widthThumb = scalingFactorThumb * size.width;
 
-        // Transform the image buffer in memory.
-        var _this = this;
-        _this.resize(width, height)
-          .toBuffer(imageType, function(err, buffer) {
+        const self = this;
+        self.resize(width, height).toBuffer(imageType, (err, buffer) => {
+          if (err) {
+            return next(err);
+          }
+
+          self.resize(widthThumb, heightThumb).toBuffer(imageType, (err, bufferThumb) => {
             if (err) {
-              next(err);
-            } else {
-              _this.resize(widthThumb, heightThumb)
-                .toBuffer(imageType, function(err, bufferThumb) {
-                  if (err) {
-                    next(err);
-                  } else {
-                    next(null, response.ContentType, buffer, bufferThumb);
-                  }
-                });
+              return next(err);
             }
+
+            return next(null, response.ContentType, buffer, bufferThumb);
           });
+        });
       });
     },
-    function upload(contentType, data, dataThumb, next) {
-      // upload the resized image
+    function upload (ContentType, Body, dataThumb, next) {
       s3.putObject({
+        Body,
         Bucket: dstBucket,
+        ContentType,
         Key: dstKey,
-        Body: data,
-        ContentType: contentType
-      }, function(err, data) {
-        if(err) {
+      }, (err, data) => {
+        if (err) {
           return next(err);
         }
 
-        // upload the thumb image
         s3.putObject({
-          Bucket: dstBucket,
-          Key: dstKeyThumb,
           Body: dataThumb,
-          ContentType: contentType
-        }, function(err, data) {
+          Bucket: dstBucket,
+          ContentType,
+          Key: dstKeyThumb,
+        }, (err, data) => {
           if(err) {
             return next(err);
           }
-          // Save the reference in the database
+
           db.put({
-            TableName: dbTable,
             Item: {
-              id: srcKey.substr(0, srcKey.indexOf('-orig')),
               date: new Date().getTime(),
-              extension: imageType
-            }
+              id: srcKey.substr(0, srcKey.indexOf('-orig')),
+              extension: imageType,
+            },
+            TableName: dbTable,
           }, next);
         });
       });
     }
-    ], function (err) {
-      if (err) {
-        console.error(
-          'Unable to resize ' + srcBucket + '/' + srcKey +
-          ' and upload to ' + dstBucket + '/' + dstKey +
-          ' due to an error: ' + err
-        );
-      } else {
-        console.log(
-          'Successfully resized ' + srcBucket + '/' + srcKey +
-          ' and uploaded to ' + dstBucket + '/' + dstKey
-        );
-      }
-      callback(null, "message");
+  ], err => {
+    const src = `${srcBucket}/${srcKey}`;
+    const dest = `${dstBucket}/${dstKey}`;
+
+    if (err) {
+      console.error(`Unable to resize ${src} and upload to ${dest} due to an error: ${err}`);
     }
-  );
+    else {
+      console.log(`Successfully resized ${src} and uploaded to ${dest}`);
+    }
+
+    callback(null, 'message');
+    return;
+  });
 };
